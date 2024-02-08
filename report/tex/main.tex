@@ -1,0 +1,79 @@
+\documentclass{article}
+\usepackage{graphicx}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{biblatex} %Imports biblatex package
+    \addbibresource{sample.bib}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{microtype}
+\usepackage{tikz-cd}
+\usepackage{xcolor}
+\usepackage{fancyvrb}
+\usepackage{hyperref}
+% algorithm
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+
+% For binary trees
+\usepackage{tikz}
+
+% for set diagrams 
+
+% jazz up the colours yourself if you wanted!
+\hypersetup{
+    linkcolor  = blue,
+    urlcolor   = blue,
+    citecolor = red,   
+    colorlinks = true,
+}  
+
+\newcommand\note[1]{\textcolor{red}{#1}}
+
+\renewcommand{\emptyset}{\varnothing}
+\renewcommand{\complement}{\mathsf{c}}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem{corollary}{Corollary}[section]
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+
+\theoremstyle{axiom}
+\newtheorem{axiom}{Axiom}[section]
+
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+
+\theoremstyle{example}
+\newtheorem*{example}{Example}
+
+\usepackage{xcolor}
+\usepackage{listings}
+
+\usepackage{xparse}
+
+\NewDocumentCommand{\codeword}{v}{%
+\texttt{\textcolor{blue}{#1}}%
+}
+
+\usepackage{todonotes}
+
+\title{CSC494 Report}
+\author{Alessandro Marmi}
+\date{January 2024}
+
+\begin{document}
+
+\maketitle
+
+% \tableofcontents
+
+% \newpage 
+\input{introduction.tex}
+
+\end{document}
