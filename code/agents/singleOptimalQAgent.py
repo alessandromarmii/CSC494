@@ -94,13 +94,6 @@ class QLearningAgent(Agent):
     self.epsilon_decay = 0.99996
     self.epsilon_min = 0.03
 
-  def _combine_state(self, observation, location):
-        # Flatten the observation and append the agent's location
-
-        location = np.array(location, dtype=np.float32)
-
-        state = np.append(observation, location)
-        return state
 
   def select_action(self, state, test=False):
     if np.random.rand() < self.epsilon and not test:
