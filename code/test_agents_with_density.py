@@ -10,11 +10,11 @@ import torch
 
 # Initialize environment and agents
 env = OrchardEnv(agents=[], max_apples=1000)
-agents = [OptimalQLearningAgent(env.observation_space, env.action_space,weight_decay=1e-6, model_layer_size=600) for _ in range(3)]
+agents = [OptimalQLearningAgent(env.observation, env.action_space,weight_decay=1e-6, model_layer_size=600) for _ in range(3)]
 
-f1 = "model_weights/quasi_optimal_agent0_3_4800.pth"
-f2 =  "model_weights/quasi_optimal_agent1_3_4800.pth"
-f3 =  "model_weights/quasi_optimal_agent2_3_4800.pth"
+f1 = "model_weights/quasi_optimal_agent0_3_2400.pth"
+f2 =  "model_weights/quasi_optimal_agent1_3_2400.pth"
+f3 =  "model_weights/quasi_optimal_agent2_3_2400.pth"
 
 state_dict_0 = torch.load(f1)
 state_dict_1 = torch.load(f2)
@@ -55,30 +55,22 @@ for episode in range(num_episodes):
             print("We interrupt the training and start testing.")
             break
 
-    observation = env.reset()
-    observations = [deepcopy(observation) for _ in range(len(agents))]
+    observations = env.reset()
     
-    for i in range(len(agents)):
-        observations[i] = agents[i]._combine_state(observations[i], agents[i].location)
-
     episode_rewards = 0  # Initialize episode rewards for each agent
 
     episode_rewards_by_agent = [0] * len(agents)
 
     while True:
         actions = [agent.select_action(observation) for agent, observation in zip(agents, observations)]
-        next_observation, done, info = env.step(actions)
+        next_observations, done, info = env.step(actions)
 
         tot_reward = len(info['rewarded agents']) if info['rewarded agents'] else 0
         episode_rewards += tot_reward
 
-        next_observations = [deepcopy(next_observation) for _ in range(len(agents))]
-
         for i, agent in enumerate(agents):
             agent_reward = 1 if i in info["rewarded agents"] else 0
             episode_rewards_by_agent[i] += agent_reward
-
-            next_observations[i] = agent._combine_state(next_observations[i], agent.location)
             # Add experience to the agent's buffer
 
             episode_buffers[i].append((observations[i], actions[i], tot_reward, next_observations[i], done))
@@ -120,19 +112,13 @@ while testing and test_count < 5:
 
         num_test_episodes = 500
         for episode in range(num_test_episodes):
-            observation = env.reset()
-            observations = [deepcopy(observation) for _ in range(len(agents))]
-            for i in range(len(agents)):
-                observations[i] = agents[i]._combine_state(observations[i], agents[i].location)
-
+            observations = env.reset()
             episode_rewards = [0 for _ in agents]  # Initialize episode rewards for each agent
 
             while True:
                 
                 actions = [agent.select_action(observation, test=True) for agent, observation in zip(agents, observations)]
-                next_observation, done, info = env.step(actions)
-
-                next_observations = [deepcopy(next_observation) for _ in range(len(agents))]
+                next_observations, done, info = env.step(actions)
 
                 for i, agent in enumerate(agents):
                     
@@ -143,8 +129,6 @@ while testing and test_count < 5:
                     agent_reward = 1 if i in info["rewarded agents"] else 0
 
                     episode_rewards[i] += agent_reward
-
-                    next_observations[i] = agent._combine_state(next_observations[i], agent.location)
 
                 observations = next_observations
                 if done:

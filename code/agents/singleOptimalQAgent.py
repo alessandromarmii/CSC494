@@ -3,15 +3,15 @@ from .agent import *
 
 
 class SingleOptimalQLearningAgent(Agent):
-  def __init__(self, observation_space, action_space, location=(0,0), learning_rate=0.001, gamma=0.95, model_layer_size=None):
+  def __init__(self, observation, action_space, location=(0,0), learning_rate=0.001, gamma=0.95, model_layer_size=None):
     super(SingleOptimalQLearningAgent, self).__init__(location)
-    self.observation_space = observation_space
+    self.observation = observation
     self.action_space = action_space
     self.learning_rate = learning_rate
     self.gamma = gamma
 
     # Q-network
-    input_size = np.prod(observation_space.shape) + 2 # grid info + location
+    input_size = np.prod(observation.shape) + 2 # grid info + location
     output_size = action_space.n
     self.q_network = QNetworkOptimalAgent(input_size, output_size, model_layer_size)
    # self.optimizer = optim.Adam(self.q_network.parameters(), lr=learning_rate, weight_decay=1e-6)
@@ -21,14 +21,6 @@ class SingleOptimalQLearningAgent(Agent):
     self.epsilon = 1.0
     self.epsilon_decay = 0.99995
     self.epsilon_min = 0.03
-
-  def _combine_state(self, observation, location):
-        # Flatten the observation and append the agent's location
-
-        location = np.array(location, dtype=np.float32)
-
-        state = np.append(observation, location)
-        return state
 
   def select_action(self, state, test=False):
     if np.random.rand() < self.epsilon and not test:
@@ -83,15 +75,15 @@ class SingleOptimalQLearningAgent(Agent):
 
 
 class QLearningAgent(Agent):
-  def __init__(self, observation_space, action_space, location=(0,0), learning_rate=0.001, gamma=0.95):
+  def __init__(self, observation, action_space, location=(0,0), learning_rate=0.001, gamma=0.95):
     super(QLearningAgent, self).__init__(location)
-    self.observation_space = observation_space
+    self.observation = observation
     self.action_space = action_space
     self.learning_rate = learning_rate
     self.gamma = gamma
 
     # Q-network
-    input_size = np.prod(observation_space.shape) + 2 # grid info + location
+    input_size = np.prod(observation.shape) + 2 # grid info + location
     output_size = action_space.n
     self.q_network = SimpleQNetwork(input_size, output_size)
    # self.optimizer = optim.Adam(self.q_network.parameters(), lr=learning_rate, weight_decay=1e-6)

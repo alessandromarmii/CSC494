@@ -2,15 +2,13 @@ from agents.basicQAgent import QLearningAgent
 import matplotlib.pyplot as plt
 from environment.orchard import OrchardEnv
 import numpy as np
-from copy import deepcopy
-
 
 
 # Test 3 selfish (i.e. maximizing individual reward, not social) basic Q agents in 8x8 grid.
 
 # Initialize environment and agents
 env = OrchardEnv(agents=[], max_apples=1000)
-agents = [QLearningAgent(env.observation_space, env.action_space) for _ in range(3)]
+agents = [QLearningAgent(env.observation, env.action_space) for _ in range(3)]
 for agent in agents:
     env.add_agent(agent)
 
@@ -28,26 +26,18 @@ for episode in range(num_episodes):
     if episode > 1 and episode % 200 == 0:
         print(episode, np.mean(training_rewards[-100:]))
 
-    observation = env.reset()
-    observations = [deepcopy(observation) for _ in range(len(agents))]
-    
-    for i in range(len(agents)):
-        observations[i] = agents[i]._combine_state(observations[i], agents[i].location)
+    observations = env.reset()
 
     episode_rewards = [0 for _ in agents]  # Initialize episode rewards for each agent
 
     while True:
         actions = [agent.select_action(observation) for agent, observation in zip(agents, observations)]
-        next_observation, done, info = env.step(actions)
-
-        next_observations = [deepcopy(next_observation) for _ in range(len(agents))]
+        next_observations, done, info = env.step(actions)
 
         for i, agent in enumerate(agents):
             agent_reward = 1 if i in info["rewarded agents"] else 0
             episode_rewards[i] += agent_reward
 
-            next_observations[i] = agent._combine_state(next_observations[i], agent.location)
-            
             # Add experience to the agent's buffer
             episode_buffers[i].append((observations[i], actions[i], agent_reward, next_observations[i], done))
             counters[i] += 1
@@ -83,11 +73,7 @@ agent_test_rewards = [[] for _ in agents]  # Initialize reward storage for each 
 num_test_episodes = 500
 for episode in range(num_test_episodes):
 
-    observation = env.reset()
-
-    observations = [deepcopy(observation) for _ in range(len(agents))]
-    for i in range(len(agents)):
-        observations[i] = agents[i]._combine_state(observations[i], agents[i].location)
+    observations = env.reset()
 
     episode_rewards = [0 for _ in agents]  # Initialize episode rewards for each agent
 
@@ -95,16 +81,12 @@ for episode in range(num_test_episodes):
     
         # actions = [agent.select_action(observation, test=True) for agent, observation in zip(agents, observations)]
         actions = [agent.select_action(observation, test=True) for agent, observation in zip(agents, observations)]
-        next_observation, done, info = env.step(actions)
-
-        next_observations = [deepcopy(next_observation) for _ in range(len(agents))]
+        next_observations, done, info = env.step(actions)
 
         for i, agent in enumerate(agents):
             agent_reward = 1 if i in info["rewarded agents"] else 0
 
             episode_rewards[i] += agent_reward
-
-            next_observations[i] = agent._combine_state(next_observations[i], agent.location)
 
         observations = next_observations
         if done:

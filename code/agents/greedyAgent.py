@@ -2,17 +2,18 @@ import numpy as np
 from .agent import Agent
 
 class GreedyApplePickerAgent(Agent):
-    def __init__(self, observation_space, action_space, location=(0,0)):
+    def __init__(self, location=(0,0)):
         super(GreedyApplePickerAgent, self).__init__(location)
-        self.observation_space = observation_space
-        self.action_space = action_space
         self.location = location
 
     def select_action(self, observation):
+        
+        observation = observation[:-2]
+        # Reshape the array into 8x8x2
+        observation = observation.reshape((8, 8, 2))
+
         # Extract relevant information from the observation
         apples = observation[:, :, 0]  # Assuming the first channel represents the number of apples
-
-        
 
         # Get the coordinates of the agent
         agent_row, agent_col = np.where(observation[:, :, 1] > 0) # this assumes there is only one agent
@@ -25,7 +26,6 @@ class GreedyApplePickerAgent(Agent):
 
         # Find the coordinates of all apples in the observation
         apple_rows, apple_cols = np.where(apples > 0)
-
 
         if len(apple_rows) == 0:
             # No apples found, stay in the same spot

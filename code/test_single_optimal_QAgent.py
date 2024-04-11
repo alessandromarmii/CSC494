@@ -27,7 +27,7 @@ def plot_rewards(rewards, title):
 
 # Test selfish QLearningAgent
 env = OrchardEnv(agents=[], max_apples=1000)
-agent = SingleOptimalQLearningAgent(env.observation_space, env.action_space, model_layer_size=600)
+agent = SingleOptimalQLearningAgent(env.observation, env.action_space, model_layer_size=600)
 state_dict = torch.load("model_weights/single_optimal_agent.pth")
 agent.q_network.load_state_dict(state_dict)
 
@@ -72,8 +72,6 @@ for episode in range(num_episodes):
         
     observation = env.reset()
 
-    observation = agent._combine_state(observation, agent.location)
-
     episode_reward = 0
     
     episode_buffer = []  # Buffer to store experiences from the current episode
@@ -84,8 +82,6 @@ for episode in range(num_episodes):
         action = agent.select_action(observation)
 
         new_observation, done, info = env.step([action])
-
-        new_observation = agent._combine_state(new_observation, agent.location)
 
         agent_reward = 1 if 0 in info["rewarded agents"] else 0
         
@@ -131,14 +127,12 @@ while testing:
 
         for episode in range(num_test_episodes):
             observation = env.reset()
-            observation = agent._combine_state(observation, agent.location)
             episode_reward = 0
             i = 0
             while True:
                 i += 1
                 action = agent.select_action(observation, test=True)
                 observation, done, info = env.step([action])
-                observation = agent._combine_state(observation, agent.location)
                 episode_reward += 1 if 0 in info["rewarded agents"] else 0
                 if done:
                     break

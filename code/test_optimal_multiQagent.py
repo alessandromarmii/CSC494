@@ -2,28 +2,27 @@ from agents.optimalQAgent import OptimalQLearningAgent
 import matplotlib.pyplot as plt
 from environment.orchard import OrchardEnv
 import numpy as np
-from copy import deepcopy
 import threading
 import time
 import torch
 
 # Initialize environment and agents
 env = OrchardEnv(agents=[], max_apples=1000)
-agents = [OptimalQLearningAgent(env.observation_space, env.action_space, learning_rate=0.001, model_layer_size=600) for _ in range(3)]
+agents = [OptimalQLearningAgent(env.observation, env.action_space, learning_rate=0.001, model_layer_size=600) for _ in range(3)]
 
-state_dict_0 = torch.load("model_weights/quasi_optimal_agent0_3.pth")
+"""state_dict_0 = torch.load("model_weights/quasi_optimal_agent0_3.pth")
 state_dict_1 = torch.load("model_weights/quasi_optimal_agent1_3.pth")
 state_dict_2 = torch.load("model_weights/quasi_optimal_agent2_3.pth")
 
 agents[0].q_network.load_state_dict(state_dict_0)
 agents[1].q_network.load_state_dict(state_dict_1)
-agents[2].q_network.load_state_dict(state_dict_2)
+agents[2].q_network.load_state_dict(state_dict_2)"""
 
 
 for agent in agents:
-    agent.epsilon_decay = 0.9996
-    agent.learning_rate = 0.0001
-    agent.epsilon = 0.25
+    agent.epsilon_decay = 0.99997
+    agent.epsilon_min = 0
+    # agent.epsilon = 0.25
     env.add_agent(agent)
 
 stop_training = False  # Global flag to control when to stop training
@@ -41,12 +40,13 @@ def check_for_stop():
 stop_thread = threading.Thread(target=check_for_stop)
 stop_thread.start()
 
-num_episodes = 30000
+num_episodes = 100000
 training_rewards = []
 training_rewards_by_agent  = [[] for _ in range(3)]
 batch_size = 250
 
-episode_buffers = {i: [] for i in range(len(agents))}
+episode_buffers = {i: [None] * batch_size for i in range(len(agents))}
+counter = {i: 0 for i in range(len(agents))}
 
 for episode in range(num_episodes):
     if stop_training:  # Check the global flag
@@ -59,53 +59,43 @@ for episode in range(num_episodes):
         agent2 =  np.mean(training_rewards_by_agent[1][-200:])
         agent3 =  np.mean(training_rewards_by_agent[2][-200:])
 
-        if avg > 632:
+        if avg > 634:
             for i, agent in enumerate(agents):
-                file_name = f'model_weights/quasi_optimal_agent{i}_3_{episode}.pth'
+                file_name = f'model_weights/quasi_optimal_agent{i}_{episode}.pth'
                 # Replace 'q_table' with the actual attribute name if it's different
                 torch.save(agent.q_network.state_dict(), f'model_weights/quasi_optimal_agent{i}_3_{episode}.pth')
                 print(f"Saved {file_name}.")
 
-
-        
         print(episode, avg, agent1, agent2, agent3)
         if avg > 636 and np.mean(training_rewards[-400:]) > 635:
             print("We interrupt the training and start testing.")
             break
 
-    observation = env.reset()
-    observations = [deepcopy(observation) for _ in range(len(agents))]
-    
-    for i in range(len(agents)):
-        observations[i] = agents[i]._combine_state(observations[i], agents[i].location)
-
+    observations = env.reset()
     episode_rewards = 0  # Initialize episode rewards for each agent
 
     episode_rewards_by_agent = [0] * len(agents)
 
     while True:
         actions = [agent.select_action(observation) for agent, observation in zip(agents, observations)]
-        next_observation, done, info = env.step(actions)
+        next_observations, done, info = env.step(actions)
 
         tot_reward = len(info['rewarded agents']) if info['rewarded agents'] else 0
         episode_rewards += tot_reward
 
-        next_observations = [deepcopy(next_observation) for _ in range(len(agents))]
-
         for i, agent in enumerate(agents):
             agent_reward = 1 if i in info["rewarded agents"] else 0
             episode_rewards_by_agent[i] += agent_reward
-
-            next_observations[i] = agent._combine_state(next_observations[i], agent.location)
             # Add experience to the agent's buffer
 
-            episode_buffers[i].append((observations[i], actions[i], tot_reward, next_observations[i], done))
-
+            episode_buffers[i][counter[i]] = (observations[i], actions[i], tot_reward, next_observations[i], done)
+            counter[i] += 1
             # Check if buffer is ready for batch update
-            if len(episode_buffers[i]) >= batch_size:
+            if counter[i] == batch_size:
                 states, actions, rewards, next_states, dones = zip(*episode_buffers[i])
                 agent.update_q_function(states, actions, rewards, next_states, dones)
-                episode_buffers[i] = []  # Clear the buffer after updating
+                counter[i] = 0
+        
 
         observations = next_observations
         if done:
@@ -136,10 +126,8 @@ agent_test_rewards = [[] for _ in agents]  # Initialize reward storage for each 
 num_test_episodes = 500
 for episode in range(num_test_episodes):
     observation = env.reset()
-    observations = [deepcopy(observation) for _ in range(len(agents))]
-    for i in range(len(agents)):
-        observations[i] = agents[i]._combine_state(observations[i], agents[i].location)
-
+    observations = [agent._combine_state(observation) for agent in agents]
+    
     episode_rewards = [0 for _ in agents]  # Initialize episode rewards for each agent
 
     while True:
@@ -147,14 +135,12 @@ for episode in range(num_test_episodes):
         actions = [agent.select_action(observation, test=True) for agent, observation in zip(agents, observations)]
         next_observation, done, info = env.step(actions)
 
-        next_observations = [deepcopy(next_observation) for _ in range(len(agents))]
+        next_observations = [agent._combine_state(next_observation) for agent in agents]
 
         for i, agent in enumerate(agents):
             agent_reward = 1 if i in info["rewarded agents"] else 0
 
             episode_rewards[i] += agent_reward
-
-            next_observations[i] = agent._combine_state(next_observations[i], agent.location)
 
         observations = next_observations
         if done:

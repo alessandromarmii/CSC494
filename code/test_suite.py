@@ -10,12 +10,17 @@ def _test_greedy_agents(env, agents, num_test_episodes):
 
     for episode in range(num_test_episodes):
         observations = env.reset()  # Reset environment and get initial observations
+        
+        if len(agents) > 1:
+            observations = observations[0]
+
         episode_rewards = [0 for _ in agents]  # Initialize episode rewards for each agent to 0
 
         while True:
             actions = [agent.select_action(observations) for agent in agents]  # Get action from each agent
             observations, done , info = env.step(actions)  # Environment step based on actions
-
+            if len(agents) > 1:
+                observations = observations[0]
             for i in range(len(agents)):
                 if i in info["rewarded agents"]:
                     episode_rewards[i] += 1  # Increment reward for the agent if it picked an apple
@@ -128,7 +133,7 @@ def test_random_multiagent(grid_size=8, num_agents=3):
 def test_single_greedy_agent(grid_size=8):
     # Testing with a single agent
     env = OrchardEnv(agents=[])
-    single_agent = GreedyApplePickerAgent(env.observation_space, env.action_space)
+    single_agent = GreedyApplePickerAgent()
     env.add_agent(single_agent)
     num_test_episodes = 500
     single_agent_rewards = _test_greedy_agents(env, [single_agent], num_test_episodes)
@@ -150,7 +155,7 @@ def test_single_greedy_agent(grid_size=8):
 def test_greedy_multiagent(grid_size=8):
     # Testing with 3 agents
     env = OrchardEnv(agents=[])  # Initialize environment with 3 agents
-    agents = [GreedyApplePickerAgent(env.observation_space, env.action_space) for _ in range(3)]  # Initialize agents
+    agents = [GreedyApplePickerAgent() for _ in range(3)]  # Initialize agents
     for agent in agents:
         env.add_agent(agent)
 

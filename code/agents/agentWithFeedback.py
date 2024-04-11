@@ -2,11 +2,13 @@ from .agent import *
 from .qNetworks.QNetworks import *
 import numpy as np
 import random
+from scipy.optimize import minimize
+import time
 
 class agentWithFeedback(Agent):
-  def __init__(self, observation_space, action_space, location=(0,0), attention_allocation=[], attention_bound=1, learning_rate=0.001, gamma=0.95, feedback_learning_rate=0.001, feedback_importance=0.5):
+  def __init__(self, observation, action_space, location=(0,0), attention_allocation=[], attention_bound=1, learning_rate=0.001, gamma=0.95, feedback_learning_rate=0.001, feedback_importance=0.5):
     super(agentWithFeedback, self).__init__(location)
-    self.observation_space = observation_space
+    self.observation = observation
     self.action_space = action_space
 
     self.learning_rate = learning_rate
@@ -32,7 +34,7 @@ class agentWithFeedback(Agent):
     self.attention_allocation = attention_allocation
 
     # selfish Q-network
-    input_size = np.prod(observation_space.shape) + 2 # grid info + location
+    input_size = np.prod(observation.shape) + 2 # grid info + location
     output_size = action_space.n
 
     self.q_network_selfish = QNetworkOptimalAgent(input_size, output_size, model_layer_size=600)
@@ -55,13 +57,6 @@ class agentWithFeedback(Agent):
   def q_ability(self, value):
      return np.e**(-value/2)
 
-  def _combine_state(self, observation, location):
-        # Flatten the observation and append the agent's location
-
-        location = np.array(location, dtype=np.float32)
-
-        state = np.append(observation, location)
-        return state
 
   def select_action(self, state, test=False):
     if np.random.rand() < self.epsilon and not test: # we explore
@@ -88,10 +83,11 @@ class agentWithFeedback(Agent):
       return actions
     
    
-  def provide_feedback(self, states, actions, actors, optimal_models):
+  def provide_feedback_original(self, states, actions, actors, optimal_models):
     # states = numpy array of states (state_size * num_states)
     # actions = action performed, actor that performed it, for each state ((num_agents-1) * num_states)
     # actors = list of actors
+    # returns: 
 
     states_tensor = torch.Tensor(np.array(states))  # Convert states to tensor (maybe already tensors??)
     actions_tensor = torch.tensor(actions)   # Assuming actions is numpy array and action is at index 0
@@ -136,9 +132,81 @@ class agentWithFeedback(Agent):
         q = self.q_ability(s)  # Assuming q_ability can process batches
 
         B_vals.append(p * q)
-
+   
+    
     return feedbacks, B_vals  # Assuming we want feedback per actor for each state
 
+
+  def provide_feedback(self, states, actions, actors, optimal_models):
+      # Assume states are already tensors. If not, convert outside this function to avoid repeated conversion.
+
+      # returns: feedbacks List[Bool] of lenght len(actors) (it corresponds to whether or not we provide feedback to each actor) 
+      # returns B_vals
+
+      start_time = time.time()  # Start timing
+
+      states_np = np.array(states)  # This concatenates the list of arrays into a single numpy array
+
+      states_tensor = torch.tensor(states_np, dtype=torch.float32)  # Now converting to tensor is efficient
+
+      actions_tensor = torch.tensor(actions, dtype=torch.long)
+
+      states_conversion_time = time.time()  # Time after states conversion
+
+      # Calculate expected rewards for all states at once and normalize
+      expected_rewards = self.q_network_expected_feedback(states_tensor)
+      max_expected_rewards = expected_rewards.argmax(dim=1, keepdim=True).clamp(min=1)
+      expected_rewards /= max_expected_rewards
+
+      expected_rewards_calculation_time = time.time()  # Time after expected rewards calculation
+
+      # Extract the value of the performed action for each state
+      action_values = expected_rewards.gather(1, actions_tensor.unsqueeze(1)).squeeze(1)
+
+      # Calculate probability of interest for each action
+      p_interest = self.p_of_interest((action_values - 1).abs())
+
+      # Vectorize feedback calculation
+      attention_on_actors = torch.tensor(self.attention_allocation)
+      delay_values = torch.exp(-self.alpha / attention_on_actors)
+      probs = delay_values * p_interest
+      feedbacks = torch.rand(len(actors)) < probs
+
+      # Batch calculate B values
+      B_vals = []
+      for actor_index, actor in enumerate(actors):
+         q_network_expected_feedback = actor.q_network_expected_feedback(states_tensor)
+         q_network_expected_feedback /= q_network_expected_feedback.abs().max()
+
+         q_values_actor = actor.q_network_selfish(states_tensor)
+         q_values_actor /= q_values_actor.abs().max()
+
+         optimal_q_values = optimal_models[actor_index](states_tensor)
+         optimal_q_values /= optimal_q_values.abs().max()
+
+         vals = (q_values_actor + self.feedback_importance * q_network_expected_feedback) / (1 + self.feedback_importance) - optimal_q_values
+         print("vals: ", vals)
+         
+         s = vals.abs().sum(dim=1)
+         print("sum: ", s)
+
+         print("self.q_ability(s): ", self.q_ability(s))
+         print("p_interest: ", p_interest)
+         print("self.q_ability(s) * p_interest: ", self.q_ability(s) * p_interest)
+
+         B_vals.append(self.q_ability(s) * p_interest)
+      
+
+      final_time = time.time()
+      total_time = final_time - start_time
+      # print("states conversion time is: ", (100 * (states_conversion_time- start_time)) / total_time, "%") <- circa 2%
+      # print("expected_rewards_calculation_time is: ", (100 * (expected_rewards_calculation_time - states_conversion_time)) / total_time, "%") <- 10% more or less
+      
+      print("feedbacks: ", feedbacks.tolist())
+      print("B_vals: ", torch.stack(B_vals).tolist())
+      # Convert feedbacks and B_vals to desired format if needed
+      return feedbacks.tolist(), torch.stack(B_vals).tolist()
+   
 
   def update_q_function(self, states, actions, rewards, next_states, dones):
     # Convert to tensors and ensure correct shapes
@@ -216,9 +284,6 @@ class agentWithFeedback(Agent):
 
 
 
-from scipy.optimize import minimize
-import numpy as np
-
 def solve_attention_optimization_problem(B_values, alpha_value, max_attention):
   """
   attention_allocation is 
@@ -242,10 +307,10 @@ def solve_attention_optimization_problem(B_values, alpha_value, max_attention):
       return -(B_agent0 * np.exp(alpha_value / x1) + B_agent1 * np.exp(alpha_value / x2))
 
   # Constraints: x1, x2 >= 0 and x1, x2 <= M
-  bounds = [(0, M), (0, M)]  # (min, max) pairs for x1 and x2
+  bounds = [(0, max_attention), (0, max_attention)]  # (min, max) pairs for x1 and x2
 
   # Initial guess
-  x0 = [M/2, M/2]
+  x0 = [ max_attention /2, max_attention /2]
 
   # Optimize
   result = minimize(objective, x0, bounds=bounds, method='SLSQP')

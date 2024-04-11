@@ -87,7 +87,10 @@ class OrchardEnv(Env):
 
     Tells you number of agents and apples for each point in the grid.
     """
-    return self.observation
+    if len(self.agents) == 1:
+       return self.agents[0]._combine_state(self.observation)
+
+    return [agent._combine_state(self.observation) for agent in self.agents]
 
   def reset(self):
     # reset steps to 0.
@@ -106,7 +109,7 @@ class OrchardEnv(Env):
       self.agents[i].set_location((agent_row, agent_col))
       i += 1
 
-    return self.observation
+    return self._get_observations()
 
   def _move_agent(self, agent_id, action):
     agent = self.agents[agent_id]
