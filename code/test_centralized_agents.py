@@ -1,6 +1,7 @@
 # epochs_to_run are 4400, 4200, 4600, 4000
 import matplotlib.pyplot as plt
 from agents.centralizedAgent import QLearningAgentCentralized
+from agents.agent import Agent
 import matplotlib.pyplot as plt
 from environment.orchard import OrchardEnv
 import numpy as np
