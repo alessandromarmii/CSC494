@@ -4,10 +4,10 @@ import torch.optim as optim
 import numpy as np
 
 
-class QNetworkOptimalAgent(nn.Module):
+class NonSelfishQNetwork(nn.Module):
     def __init__(self, input_size, output_size, model_layer_size=None):
          
-        super(QNetworkOptimalAgent, self).__init__()
+        super(NonSelfishQNetwork, self).__init__()
 
         if model_layer_size:   
             layers = model_layer_size
@@ -23,7 +23,7 @@ class QNetworkOptimalAgent(nn.Module):
 
     def forward(self, x):
         x = self.fc1(x)
-        x = torch.relu(x)
+        torch.relu_(x) # in-place relu
        # x = self.dropout(x)
     #    x = self.fc2(x)
     #    x = torch.relu(x)
@@ -66,5 +66,29 @@ class SimpleQNetwork(nn.Module):
        # x = self.dropout(x)
     #    x = self.fc2(x)
     #    x = torch.relu(x)
+        x = self.fc3(x)
+        return x
+
+
+class CentralizedNetwork(nn.Module):
+    def __init__(self, input_size, output_size, model_layer_size=None):
+
+        super(CentralizedNetwork, self).__init__()
+
+        if model_layer_size:
+            layers = model_layer_size
+        else:
+            layers = 1000
+
+        self.fc1 = nn.Linear(input_size, layers)
+       # self.fc2 = nn.Linear(layers, layers // 2)
+        # Initialize weights using He initialization for ReLU activation
+        self.fc3 = nn.Linear(layers, output_size)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = torch.relu(x)
+      #  x = self.fc2(x)
+      #  x = torch.relu(x)
         x = self.fc3(x)
         return x

@@ -210,6 +210,5 @@ def run_tests(grid_size=8):
         user_input = input("Choose desired test: ")
         user_input = int(user_input[0])
         
-    
 if __name__=='__main__':
     run_tests()

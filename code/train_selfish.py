@@ -2,7 +2,7 @@ from agents.basicQAgent import QLearningAgent
 import matplotlib.pyplot as plt
 from environment.orchard import OrchardEnv
 import numpy as np
-
+import torch
 
 # Test 3 selfish (i.e. maximizing individual reward, not social) basic Q agents in 8x8 grid.
 
@@ -25,6 +25,10 @@ for episode in range(num_episodes):
 
     if episode > 1 and episode % 200 == 0:
         print(episode, np.mean(training_rewards[-100:]))
+        for i, agent in enumerate(agents):
+            file_name = f'model_weights/selfish_multiagent_agent{i}_episode_{episode}.pth'
+            # Replace 'q_table' with the actual attribute name if it's different
+            torch.save(agent.q_network.state_dict(), f'model_weights/selfish_multiagent_agent{i}_episode_{episode}.pth')
 
     observations = env.reset()
 

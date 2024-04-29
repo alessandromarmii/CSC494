@@ -2,21 +2,19 @@ from agents.optimalQAgent import OptimalQLearningAgent
 import matplotlib.pyplot as plt
 from environment.orchard import OrchardEnv
 import numpy as np
-import threading
-import time
 import torch
 
 # Initialize environment and agents
 env = OrchardEnv(agents=[], max_apples=1000)
 agents = [OptimalQLearningAgent(env.observation, env.action_space, learning_rate=0.001, model_layer_size=600) for _ in range(3)]
 
-"""state_dict_0 = torch.load("model_weights/quasi_optimal_agent0_3.pth")
-state_dict_1 = torch.load("model_weights/quasi_optimal_agent1_3.pth")
-state_dict_2 = torch.load("model_weights/quasi_optimal_agent2_3.pth")
+state_dict_0 = torch.load("final_weights/decentralized/nonselfish/agent0.pth")
+state_dict_1 = torch.load("final_weights/decentralized/nonselfish/agent1.pth")
+state_dict_2 = torch.load("final_weights/decentralized/nonselfish/agent2.pth")
 
 agents[0].q_network.load_state_dict(state_dict_0)
 agents[1].q_network.load_state_dict(state_dict_1)
-agents[2].q_network.load_state_dict(state_dict_2)"""
+agents[2].q_network.load_state_dict(state_dict_2)
 
 
 for agent in agents:
@@ -25,22 +23,9 @@ for agent in agents:
     # agent.epsilon = 0.25
     env.add_agent(agent)
 
-stop_training = False  # Global flag to control when to stop training
 training_is_complete = False
-
-def check_for_stop():
-    global stop_training
-    while not training_is_complete:
-        user_input = input()
-        if user_input.lower() == "stop":
-            stop_training = True
-            break
-
-# Start a thread that listens for the "stop" command
-stop_thread = threading.Thread(target=check_for_stop)
-stop_thread.start()
-
-num_episodes = 100000
+# num_episodes = 100000
+num_episodes = 0
 training_rewards = []
 training_rewards_by_agent  = [[] for _ in range(3)]
 batch_size = 250
@@ -49,9 +34,6 @@ episode_buffers = {i: [None] * batch_size for i in range(len(agents))}
 counter = {i: 0 for i in range(len(agents))}
 
 for episode in range(num_episodes):
-    if stop_training:  # Check the global flag
-        print("Stop command received, interrupting the training.")
-        break
 
     if episode > 1 and episode % 200 == 0:
         avg = np.mean(training_rewards[-200:])
@@ -66,10 +48,6 @@ for episode in range(num_episodes):
                 torch.save(agent.q_network.state_dict(), f'model_weights/quasi_optimal_agent{i}_3_{episode}.pth')
                 print(f"Saved {file_name}.")
 
-        print(episode, avg, agent1, agent2, agent3)
-        if avg > 636 and np.mean(training_rewards[-400:]) > 635:
-            print("We interrupt the training and start testing.")
-            break
 
     observations = env.reset()
     episode_rewards = 0  # Initialize episode rewards for each agent
@@ -106,18 +84,18 @@ for episode in range(num_episodes):
     for i in range(len(agents)):
         training_rewards_by_agent[i].append(episode_rewards_by_agent[i])
 
-training_is_complete = True
-stop_thread.join()
 
+if num_episodes:
+    # Plot training performance
+    plt.figure(figsize=(12, 5))
+    plt.plot(training_rewards, label='Total Reward per Episode during Training')
+    plt.xlabel('Episode')
+    plt.ylabel('Total Reward')
+    plt.title('Training Performance of 3 QLearning Agents')
+    plt.legend()
+    plt.show()
+    plt.savefig(f'images/nonselfish/training_results.png')
 
-# Plot training performance
-plt.figure(figsize=(12, 5))
-plt.plot(training_rewards, label='Total Reward per Episode during Training')
-plt.xlabel('Episode')
-plt.ylabel('Total Reward')
-plt.title('Training Performance of 3 QLearning Agents')
-plt.legend()
-plt.show()
 
 # Testing loop
 test_total_rewards = []
@@ -125,17 +103,14 @@ agent_test_rewards = [[] for _ in agents]  # Initialize reward storage for each 
 
 num_test_episodes = 500
 for episode in range(num_test_episodes):
-    observation = env.reset()
-    observations = [agent._combine_state(observation) for agent in agents]
+    observations = env.reset()
     
     episode_rewards = [0 for _ in agents]  # Initialize episode rewards for each agent
 
     while True:
         
         actions = [agent.select_action(observation, test=True) for agent, observation in zip(agents, observations)]
-        next_observation, done, info = env.step(actions)
-
-        next_observations = [agent._combine_state(next_observation) for agent in agents]
+        next_observations, done, info = env.step(actions)
 
         for i, agent in enumerate(agents):
             agent_reward = 1 if i in info["rewarded agents"] else 0
@@ -164,24 +139,7 @@ plt.figure(figsize=(12, 5))
 plt.plot(test_total_rewards, label='Total Reward per Episode during Testing')
 plt.xlabel('Episode')
 plt.ylabel('Total Reward')
-plt.title('Testing Performance of 3 QLearning Agents')
+plt.title('Testing Performance of 3 Non-Selfish Decentralized Agents')
+plt.hlines(average_test_reward, 1, num_test_episodes, colors='red', linestyles='dashed', label='Average Total Reward')
 plt.legend()
-plt.show()
-
-
-import os
-import torch
-
-for i, agent in enumerate(agents):
-    file_name = f'model_weights/quasi_optimal_agent{i}_3.pth'
-
-    # Check if file already exists
-    if os.path.isfile(file_name):
-        user_input = input(f"{file_name} already exists. Do you want to overwrite it? (y/n): ")
-        if user_input.lower() != 'y':
-            print(f"Not saving {file_name}.")
-            continue
-
-    # Replace 'q_table' with the actual attribute name if it's different
-    torch.save(agent.q_network.state_dict(), f'model_weights/quasi_optimal_agent{i}_3.pth')
-    print(f"Saved {file_name}.")
+plt.savefig(f'images/nonselfish/testing_results.png')
